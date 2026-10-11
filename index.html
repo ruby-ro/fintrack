@@ -1308,43 +1308,63 @@ setTimeout(()=>{try{if(LS&&!localStorage.getItem('fintrack.tour'))tourStart()}ca
  const IOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
  const standalone=()=>(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
  const NK='fintrack.pwa.nanti';let dp=null;
+ const NEED=['manifest.webmanifest','sw.js','icons/icon-192.png','icons/icon-512.png','icons/icon-maskable-512.png'];
  const snoozed=()=>{try{return Date.now()-Number(localStorage.getItem(NK)||0)<3*864e5}catch(e){return false}};
  const snooze=()=>{try{localStorage.setItem(NK,String(Date.now()))}catch(e){}};
  const box=()=>document.getElementById('pwa');
  const btn=()=>document.getElementById('instBtn');
  function hideCard(){const b=box();if(b)b.innerHTML=''}
- function showCard(ios){
+ /* cek file yang dibutuhkan agar bisa dipasang; kembalikan daftar yang tidak ditemukan di server */
+ async function missing(){
+  const out=[];
+  await Promise.all(NEED.map(async f=>{try{const r=await fetch(f,{cache:'no-store'});if(!r.ok)out.push(f)}catch(e){}}));
+  return out;
+ }
+ function showCard(mode,list){
   const b=box();if(!b||standalone())return;
-  b.innerHTML='<div class="pwa-card" role="dialog" aria-label="Pasang aplikasi FinTrack"><img src="icons/icon-192.png" alt="" width="48" height="48"><div class="pwa-t"><b>Pasang FinTrack di perangkatmu</b><span>'+
-   (ios?'Ketuk tombol Bagikan di Safari, lalu pilih Tambah ke Layar Utama.':'Buka lebih cepat dari layar utama, bisa dipakai tanpa internet, dan data tetap tersimpan.')+
-   '</span></div><div class="pwa-a">'+(ios?'<button class="btn sm" id="pwaLater">Mengerti</button>':'<button class="btn sm alt" id="pwaLater">Nanti</button><button class="btn sm" id="pwaGo">Pasang</button>')+'</div></div>';
-  const l=document.getElementById('pwaLater'),g=document.getElementById('pwaGo');
+  let t='Pasang FinTrack di perangkatmu',d,a;
+  if(mode==='ios'){d='Ketuk tombol Bagikan di Safari, lalu pilih Tambah ke Layar Utama.';a='<button class="btn sm" id="pwaLater">Mengerti</button>'}
+  else if(mode==='manual'){d='Buka menu browser (titik tiga di kanan atas Chrome), lalu pilih Pasang aplikasi atau Tambahkan ke layar utama.';a='<button class="btn sm" id="pwaLater">Mengerti</button>'}
+  else if(mode==='problem'){t='Aplikasi belum bisa dipasang';d='File ini belum ada di GitHub: '+list.join(', ')+'. Unggah file tersebut (folder icons ikut diunggah), lalu buka ulang.';a='<button class="btn sm alt" id="pwaClose">Tutup</button>'}
+  else{d='Buka lebih cepat dari layar utama, bisa dipakai tanpa internet, dan data tetap tersimpan.';a='<button class="btn sm alt" id="pwaLater">Nanti</button><button class="btn sm" id="pwaGo">Pasang</button>'}
+  b.innerHTML='<div class="pwa-card" role="dialog" aria-label="'+t+'"><img src="icons/icon-192.png" alt="" width="48" height="48"><div class="pwa-t"><b>'+t+'</b><span>'+d+'</span></div><div class="pwa-a">'+a+'</div></div>';
+  const l=document.getElementById('pwaLater'),g=document.getElementById('pwaGo'),c=document.getElementById('pwaClose');
   if(l)l.onclick=()=>{snooze();hideCard()};
+  if(c)c.onclick=hideCard;
   if(g)g.onclick=()=>pwaInstall();
  }
  function whenFree(fn,n){if(n===undefined)n=8;if(document.getElementById('tour')&&n>0){setTimeout(()=>whenFree(fn,n-1),3000)}else fn()}
+ /* tombol Pasang: kalau browser sudah siap, langsung pasang; kalau belum, jelaskan kenapa */
  window.pwaInstall=async function(){
+  if(standalone()){toast('FinTrack sudah terpasang di perangkat ini.');return}
   if(dp){
    hideCard();
    try{dp.prompt();const r=await dp.userChoice;if(r&&r.outcome!=='accepted')snooze()}catch(e){}
    dp=null;return;
   }
-  if(IOS&&!standalone())showCard(true);
-  else toast('Gunakan menu browser lalu pilih Pasang aplikasi atau Tambahkan ke layar utama.');
+  const m=await missing();
+  if(m.length)showCard('problem',m);else showCard(IOS?'ios':'manual');
  };
  window.addEventListener('beforeinstallprompt',e=>{
   e.preventDefault();dp=e;
   const b=btn();if(b)b.hidden=false;
-  if(!snoozed())setTimeout(()=>whenFree(()=>{if(dp)showCard(false)}),2500);
+  if(!snoozed())setTimeout(()=>whenFree(()=>{if(dp)showCard()}),2500);
  });
  window.addEventListener('appinstalled',()=>{
   dp=null;hideCard();const b=btn();if(b)b.hidden=true;
   toast('FinTrack berhasil dipasang. Buka dari layar utama.');
   persist();
  });
- if(IOS&&!standalone()){
+ if(!standalone()){
   const b=btn();if(b)b.hidden=false;
-  if(!snoozed())setTimeout(()=>whenFree(()=>showCard(true)),3500);
+  if(IOS){if(!snoozed())setTimeout(()=>whenFree(()=>showCard('ios')),3500)}
+  else setTimeout(async()=>{
+   if(dp||standalone())return;
+   const m=await missing();
+   if(dp)return;
+   if(m.length)showCard('problem',m);
+   else if(!snoozed())showCard('manual');
+  },7000);
  }
  if(window.matchMedia)try{matchMedia('(display-mode: standalone)').addEventListener('change',e=>{if(e.matches){hideCard();const b=btn();if(b)b.hidden=true}})}catch(e){}
 

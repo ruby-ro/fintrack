@@ -1,6 +1,6 @@
 /* FinTrack Personal - service worker (mode offline)
    Naikkan angka VERSI setiap kali index.html diubah agar perangkat mengambil versi terbaru. */
-const VERSI = 'fintrack-v1';
+const VERSI = 'fintrack-v2';
 const INTI = [
   './',
   './index.html',
@@ -35,18 +35,23 @@ self.addEventListener('fetch', e => {
   e.respondWith(r.mode === 'navigate' ? halaman(e) : segarkan(e));
 });
 
-/* Halaman: tampilkan salinan tersimpan dulu, perbarui di latar belakang. */
+/* Halaman: ambil versi terbaru dari internet (maks. 3 detik), kalau offline/lambat pakai salinan tersimpan. */
 async function halaman(e) {
   const cache = await caches.open(VERSI);
-  const simpan = (await cache.match('./index.html')) || (await cache.match('./'));
-  const jaringan = fetch(e.request)
-    .then(res => { if (res && res.ok) cache.put('./index.html', res.clone()); return res; })
-    .catch(() => null);
-  if (simpan) { e.waitUntil(jaringan); return simpan; }
-  const res = await jaringan;
-  return res || new Response('Offline dan belum ada salinan tersimpan. Buka sekali saat online.', {
-    status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-  });
+  const simpan = () => cache.match('./index.html').then(r => r || cache.match('./'));
+  try {
+    const res = await Promise.race([
+      fetch(e.request),
+      new Promise((_, no) => setTimeout(() => no(new Error('lambat')), 3000))
+    ]);
+    if (res && res.ok) { cache.put('./index.html', res.clone()); return res; }
+    return (await simpan()) || res;
+  } catch (err) {
+    const s = await simpan();
+    return s || new Response('Offline dan belum ada salinan tersimpan. Buka sekali saat online.', {
+      status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
+  }
 }
 
 /* Ikon, manifest, font: pakai salinan tersimpan, perbarui diam-diam. */

@@ -24,4 +24,4 @@ Isi paket ini (semua harus diunggah dengan susunan yang sama):
 - Harus dibuka lewat alamat https (bukan file dari WhatsApp), kalau tidak, mode offline dan tombol pasang tidak aktif.
 - Data tersimpan di perangkat masing-masing (localStorage + salinan otomatis IndexedDB). HP dan laptop tidak saling sinkron.
 - Jangan hapus data situs / data browser, karena data ikut terhapus. Tetap unduh cadangan dari menu Kategori secara berkala.
-- Setiap kali index.html diubah, naikkan angka VERSI di sw.js (misalnya fintrack-v2) agar perangkat mengambil versi baru.
+- Setiap kali index.html diubah, naikkan angka VERSI di sw.js (misalnya fintrack-v3) agar perangkat mengambil versi baru.
